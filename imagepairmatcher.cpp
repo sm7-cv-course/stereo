@@ -49,7 +49,7 @@ SURFImagePairMatcher::match(cv::InputArray img1, cv::InputArray img2)
         {
             m_good_matches.push_back(knn_matches[i][0]);
             m_keypointsL.push_back(keypoints1[knn_matches[i][0].queryIdx]);
-            m_keypointsR.push_back(keypoints2[knn_matches[i][1].trainIdx]);
+            m_keypointsR.push_back(keypoints2[knn_matches[i][0].trainIdx]);
         }
     }
 

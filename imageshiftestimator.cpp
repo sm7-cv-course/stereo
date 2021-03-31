@@ -49,6 +49,7 @@ int ImageShiftEstimator::run()
 
     std::sort(std::begin(Yshifts), std::end(Yshifts));
     std::sort(std::begin(Xshifts), std::end(Xshifts));
+
     m_shift.y = Yshifts[static_cast<int>(static_cast<float>(Yshifts.size()) / 2.0)];
     m_shift.x = Xshifts[Xshifts.size() / 2.0];
 

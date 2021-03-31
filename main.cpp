@@ -43,7 +43,29 @@ vector<float> calcDisparityValues(vector<Point2f> l, vector<Point2f> r)
     vector<float> out;
 
     for (size_t i = 0; i < l.size(); ++i) {
+        if (fabs(l[i].y - r[i].y) < 1)
+            out.push_back(l[i].x - r[i].x);
         out.push_back(l[i].x - r[i].x);
+
+vector<float> normailize(const vector<float> &vec, float min = 0, float max = 255)
+{
+    vector<float> out;
+
+    float min_in_val = vec[0];
+    float max_in_val = vec[0];
+
+    for (size_t i = 0; i < vec.size(); ++i) {
+        if (min_in_val > vec[i]) {
+            min_in_val = vec[i];
+        }
+
+        if (max_in_val < vec[i]) {
+            max_in_val = vec[i];
+        }
+    }
+
+    for (size_t i = 0; i < vec.size(); ++i) {
+        out.push_back((max - min) * (vec[i] - min_in_val) / (max_in_val - min_in_val) + min);
     }
 
     return out;
@@ -55,6 +77,7 @@ cv::Mat calcSparseDisparityMap(vector<Point2f> l, vector<Point2f> r, cv::Mat img
 
     vector<float> disp_vec = calcDisparityValues(l, r);
 
+    disp_vec = normailize(disp_vec);
     for (int i = 0; i < l.size(); ++i) {
         out.at<uchar>(l[i].y, l[i].x) = disp_vec[i];
     }
@@ -94,6 +117,9 @@ int main()
 
     cv::watershed(imgL, sparse);
 
+    /*cv::watershed(imgL, sparse);
+
+    cv::imwrite(out_map_sparse, sparse);*/
     cv::imwrite(out_map_sparse, sparse);
 
     cout << shiftEstimator.estimatedShift();
