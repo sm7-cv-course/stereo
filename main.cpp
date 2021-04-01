@@ -15,6 +15,49 @@
 
 using namespace std;
 
+constexpr int ROI_SIZE = 16;
+constexpr int ROI_STEP = 1;
+constexpr int TEMPLATE_SIZE = 16;
+constexpr int TEMPLATE_STEP = 1;
+constexpr int Y_ADDITION = 8;
+
+
+// Very simple and not optimal correlator
+int simple_corr(cv::Mat imgL, cv::Mat imgR, vector<Point2f> &l, vector<Point2f> &r, float max_shift)
+{
+    for (size_t i = 0; i < imgL.rows - Y_ADDITION; i++) {
+        // take one row on te left image
+        // cv::Rect roiRect = cv::Rect(0, i, imgL.cols, 1);
+
+        for (size_t j = 0; j < imgR.cols - TEMPLATE_SIZE; j += TEMPLATE_STEP) {
+            cv::Rect tRect = cv::Rect(j, i, TEMPLATE_SIZE, Y_ADDITION);
+
+            float corr_max = 0;
+            int index_max_l = 0, index_max_r = 0;
+            cv::Mat corr;
+            for (int k = 0; k < imgL.cols - TEMPLATE_SIZE; k += ROI_STEP) {
+                cv::Rect roiRect = cv::Rect(k, i, TEMPLATE_SIZE, Y_ADDITION);
+
+                //cv::imwrite("roi.png", imgL(roiRect));
+                //cv::imwrite("template.png", imgR(tRect));
+
+                cv::matchTemplate(imgL(roiRect), imgR(tRect), corr, cv::TM_CCOEFF_NORMED);
+                if (corr.at<float>(0, 0) > corr_max) {
+                    corr_max = corr.at<float>(0, 0);
+                    index_max_r = j;
+                    index_max_l = k;
+                }
+            }
+            if (fabs(index_max_r - index_max_l) < max_shift * 1.5) {
+                l.push_back(Point2f(index_max_l, i));
+                r.push_back(Point2f(index_max_r, i));
+            }
+        }
+    }
+
+    return 0;
+}
+
 void stereo_depth_builder(const string &path_img1, const string &path_img2, const string &out_map)
 {
     cv::Mat imgL = cv::imread(path_img1, 0);
@@ -249,6 +292,10 @@ int main()
     shiftEstimator.setPoints(pointsL, pointsR);
     shiftEstimator.run();
 
+    pointsL.clear();
+    pointsR.clear();
+    simple_corr(imgL, imgR, pointsL, pointsR, shiftEstimator.getMaxShift().x);
+
     cv::Mat sparse = calcSparseDisparityMap(pointsL, pointsR, imgL);
 
     // cout << "sparse matrix" << sparse;
@@ -262,11 +309,11 @@ int main()
 
     cv::imwrite(out_map_sparse, sparse);*/
 
-    cv::Mat sparse_interp = applyKneighborSearch_simple(sparse);
+    //cv::Mat sparse_interp = applyKneighborSearch_simple(sparse);
 
     //cout << sparse_interp;
 
-    cv::imwrite(out_map_sparse_interp, sparse_interp);
+    //cv::imwrite(out_map_sparse_interp, sparse_interp);
 
     cout << shiftEstimator.estimatedShift();
 
