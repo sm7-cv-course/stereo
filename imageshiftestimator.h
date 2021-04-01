@@ -29,7 +29,11 @@ public:
     // Returns Filteres LSM value of input point pairs in X dimension
     //virtual int estimatedYshift();
 
+    // Median value
     Point2f estimatedShift() { return m_shift; }
+
+    Point2f getMaxShift() { return m_max_shift; }
+    Point2f getMinShift() { return m_min_shift; }
 
     // template<typename T>
     void setPoints(vector<Point2f> l, vector<Point2f> r) { m_pointsL = l, m_pointsR = r; }
@@ -40,7 +44,7 @@ public:
 
 protected:
     vector<Point2f> m_pointsL, m_pointsR;
-    Point2f m_shift;
+    Point2f m_shift, m_min_shift, m_max_shift;
 };
 
 //template class ImageShiftEstimator<cv::Point2f>;

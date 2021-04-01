@@ -53,6 +53,9 @@ int ImageShiftEstimator::run()
     m_shift.y = Yshifts[static_cast<int>(static_cast<float>(Yshifts.size()) / 2.0)];
     m_shift.x = Xshifts[Xshifts.size() / 2.0];
 
+    m_min_shift = Point2f(Xshifts.front(), Yshifts.front());
+    m_max_shift = Point2f(Xshifts.back(), Yshifts.back());
+
     return 0;
 }
 
