@@ -15,12 +15,62 @@
 
 using namespace std;
 
-constexpr int ROI_SIZE = 16;
-constexpr int ROI_STEP = 1;
-constexpr int TEMPLATE_SIZE = 16;
-constexpr int TEMPLATE_STEP = 1;
-constexpr int Y_ADDITION = 8;
+int ROI_SIZE = 16;
+int ROI_STEP = 1;
+int TEMPLATE_SIZE = 32;
+int TEMPLATE_STEP = 1;
+int Y_ADDITION = 4;
 
+cv::Mat SobelFilter(cv::Mat img, cv::Mat &hor, cv::Mat &vert, cv::Mat &mag, cv::Size w = cv::Size(3,3))
+{
+    // Convert to float and adapt value range (for simplicity)
+    img.convertTo(img, CV_32F, 1.0 / 255); // Value range: 0.0 - 1.0
+
+    // Build data for 3x3 vertical Sobel kernel
+    float sobelKernelHorizontalData[3][3] =
+    {
+        {-1, 0, 1},
+        {-2, 0, 2},
+        {-1, 0, 1}
+    };
+    // Calculate normalization divisor/factor
+    float sobelKernelNormalizationDivisor = 4.f;
+    float sobelKernelNormalizationFactor = 1.f / sobelKernelNormalizationDivisor;
+
+    // Generate cv::Mat for vertical filter kernel
+    cv::Mat sobelKernelHorizontal =
+        cv::Mat(3,3, CV_32F, sobelKernelHorizontalData); // Value range of filter result (if it is used for filtering): 0 - 4*255 or 0.0 - 4.0
+    // Apply filter kernel normalization
+    sobelKernelHorizontal *= sobelKernelNormalizationFactor; // Value range of filter result (if it is used for filtering): 0 - 255 or 0.0 - 1.0
+
+    // Generate cv::Mat for horizontal filter kernel
+    cv::Mat sobelKernelVertical;
+    cv::transpose(sobelKernelHorizontal, sobelKernelVertical);
+
+    // Apply two distinct Sobel filtering steps
+    cv::Mat imgFilterResultVertical;
+    cv::Mat imgFilterResultHorizontal;
+    cv::filter2D(img, imgFilterResultVertical, CV_32F, sobelKernelVertical);
+    cv::filter2D(img, imgFilterResultHorizontal, CV_32F, sobelKernelHorizontal);
+
+    // Build overall filter result by combining the previous results
+    cv::Mat imgFilterResultMagnitude;
+    cv::magnitude(imgFilterResultVertical, imgFilterResultHorizontal, imgFilterResultMagnitude);
+
+    // Write images to HDD. Important: convert back to uchar, otherwise we get black images
+    cv::Mat imgFilterResultVerticalUchar;
+    cv::Mat imgFilterResultHorizontalUchar;
+    cv::Mat imgFilterResultMagnitudeUchar;
+    imgFilterResultVertical.convertTo(imgFilterResultVerticalUchar, CV_8UC3, 255);
+    imgFilterResultHorizontal.convertTo(imgFilterResultHorizontalUchar, CV_8UC3, 255);
+    imgFilterResultMagnitude.convertTo(imgFilterResultMagnitudeUchar, CV_8UC3, 255);
+
+    hor = imgFilterResultHorizontal;
+    vert = imgFilterResultVertical;
+    mag = imgFilterResultMagnitude;
+
+    return imgFilterResultHorizontal;
+}
 
 // Very simple and not optimal correlator
 int simple_corr(cv::Mat imgL, cv::Mat imgR, vector<Point2f> &l, vector<Point2f> &r, float max_shift)
@@ -58,6 +108,41 @@ int simple_corr(cv::Mat imgL, cv::Mat imgR, vector<Point2f> &l, vector<Point2f> 
     return 0;
 }
 
+// Very simple and not optimal correlator
+int simple_corr2(cv::Mat imgL, cv::Mat imgR, vector<Point2f> &l, vector<Point2f> &r, float max_shift)
+{
+    for (size_t i = 0; i < imgL.rows - Y_ADDITION; i++) {
+        // take one row on te left image
+        // cv::Rect roiRect = cv::Rect(0, i, imgL.cols, 1);
+
+        cv::Rect roiRect = cv::Rect(0, i, imgL.cols, Y_ADDITION);
+        cv::Mat roiImg = imgL(roiRect);
+
+        for (size_t j = 0; j < imgR.cols - TEMPLATE_SIZE; j += TEMPLATE_STEP) {
+            cv::Rect tRect = cv::Rect(j, i, TEMPLATE_SIZE, Y_ADDITION);
+
+            cv::Mat corr;
+
+            //cv::imwrite("roi.png", roiImg);
+            //cv::imwrite("template.png", imgR(tRect));
+
+            // Apply template Matching
+            cv::matchTemplate(roiImg, imgR(tRect), corr, cv::TM_CCOEFF_NORMED);
+
+            double minVal, maxVal;
+            Point2i minLoc, maxLoc;
+            cv::minMaxLoc(corr, &minVal, &maxVal, &minLoc, &maxLoc);
+
+            if (fabs(maxLoc.x - j) < max_shift * 1.5) {
+                l.push_back(Point2f(maxLoc.x, i));
+                r.push_back(Point2f(j, i));
+            }
+        }
+    }
+
+    return 0;
+}
+
 void stereo_depth_builder(const string &path_img1, const string &path_img2, const string &out_map)
 {
     cv::Mat imgL = cv::imread(path_img1, 0);
@@ -88,12 +173,12 @@ vector<float> calcDisparityValues(vector<Point2f> l, vector<Point2f> r)
 
     vector<float> out;
 
-    cout << "disp_vec differences = ";
+    // cout << "disp_vec differences = ";
 
     for (size_t i = 0; i < l.size(); ++i) {
-        if (fabs(l[i].y - r[i].y) < 1)
+        if (fabs(l[i].y - r[i].y) < 2)
             out.push_back(l[i].x - r[i].x);
-        cout << "(" << (l[i].x - r[i].x) << ", " << (l[i].y - r[i].y) << ")";
+        // cout << "(" << (l[i].x - r[i].x) << ", " << (l[i].y - r[i].y) << ")";
     }
 
     return out;
@@ -131,11 +216,11 @@ cv::Mat calcSparseDisparityMap(vector<Point2f> l, vector<Point2f> r, cv::Mat img
 
     disp_vec = normailize(disp_vec);
 
-    cout << "disp_vec = ";
+    //cout << "disp_vec = ";
 
     for (int i = 0; i < l.size(); ++i) {
         out.at<uchar>(l[i].y, l[i].x) = disp_vec[i];
-        cout << " " << disp_vec[i];
+        // cout << " " << disp_vec[i];
     }
 
     return out;
@@ -294,13 +379,24 @@ int main()
 
     pointsL.clear();
     pointsR.clear();
-    simple_corr(imgL, imgR, pointsL, pointsR, shiftEstimator.getMaxShift().x);
+
+    cv::Mat imgL_grad_v, imgL_grad_h, imgL_grad_mag;
+    cv::Mat imgR_grad_v, imgR_grad_h, imgR_grad_mag;
+
+    cv::Mat imgL_grad = SobelFilter(imgL, imgL_grad_v, imgL_grad_h, imgL_grad_mag);
+    cv::Mat imgR_grad = SobelFilter(imgR, imgR_grad_v, imgR_grad_h, imgR_grad_mag);
+
+
+    Y_ADDITION = 16;
+    simple_corr2(imgL_grad_mag, imgR_grad_mag, pointsL, pointsR, shiftEstimator.getMaxShift().x);
+    Y_ADDITION = 4;
+    simple_corr2(imgL_grad_h, imgR_grad_h, pointsL, pointsR, shiftEstimator.getMaxShift().x);
 
     cv::Mat sparse = calcSparseDisparityMap(pointsL, pointsR, imgL);
 
     // cout << "sparse matrix" << sparse;
 
-    cv::imwrite(out_map_sparse, sparse);
+    cv::imwrite(out_map + "_T" + std::to_string(TEMPLATE_SIZE) + "_YA" + std::to_string(Y_ADDITION) + ".png", sparse);
 
     //cv::KDTree::KDTree tree;
     //auto kn = cv::ml::KNearest::create();
