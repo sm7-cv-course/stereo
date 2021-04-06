@@ -1,5 +1,6 @@
 #include "imagepairmatcher.h"
 #include "imageshiftestimator.h"
+#include "fdmsolver.h"
 
 #include <iostream>
 #include <opencv/cv.h>
@@ -350,7 +351,33 @@ cv::Mat applyKneighborSearch_simple(cv::Mat imgL)
     return out;
 }
 
+// main for finite differences
 int main()
+{
+    // Initial values
+
+    // "Boundary" points
+    std::vector<cv::Point2i> heat_points;
+    heat_points.push_back(Point2i(20, 30));
+    heat_points.push_back(Point2i(40, 70));
+
+    // Initialize FDM solver class
+    cv::Size frameSize(300, 200);
+    float initialValue = 2.0;
+    float Ct0 = 1.0;
+    float H = 10;
+    fdm::FDMSettings settings(frameSize, initialValue, Ct0, H);
+    fdm::FDMExplicit fdm(settings);
+    fdm.addBoundaryPoints(heat_points, 250, 0.0001f);
+
+    cv::Mat out = fdm.doNIterations(10000);
+
+    //std::cout << out;
+
+    cv::imwrite("FDM.png", out);
+}
+
+int main_stereo()
 {
     cout << "Hello World!" << endl;
 

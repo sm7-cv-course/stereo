@@ -19,7 +19,7 @@ endif()
 
 set(OpenCV_LIBS opencv_core opencv_highgui opencv_imgproc opencv_videoio opencv_calib3d opencv_features2d opencv_xfeatures2d opencv_flann opencv_photo opencv_aruco) #opencv_contrib
 
-add_executable(stereo-cpp-naive imagepairmatcher.cpp imageshiftestimator.cpp main.cpp)
+add_executable(stereo-cpp-naive fdmsolver.cpp imagepairmatcher.cpp imageshiftestimator.cpp main.cpp)
 
 if (UNIX)
     target_link_libraries(stereo-cpp-naive ${OpenCV_LIBS} stdc++ m)
